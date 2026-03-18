@@ -1,0 +1,217 @@
+##
+# (c) 2021-2025
+#     Cloud Ops Works LLC - https://cloudops.works/
+#     Find us on:
+#       GitHub: https://github.com/cloudopsworks
+#       WebSite: https://cloudops.works
+#     Distributed Under Apache v2.0 License
+#
+name: Release Build
+on:
+  # Run on create - but only on the support and release branches
+  create:
+  # Run only on branches PUSH except when charts are modified
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+**'
+    branches:
+      - develop
+      - support/**
+      - release/**
+    paths:
+      - '**'
+      - '.cloudopsworks/vars/**'
+      - '.cloudopsworks/values/**'
+      - '!.github/**'
+      - '!.cloudopsworks/*'
+  workflow_dispatch:
+
+concurrency: build-${{ github.repository }}-${{ github.ref }}
+
+# Permission Settings for the entire RUN
+permissions:
+  actions: write
+  contents: write
+  packages: write
+  statuses: write
+  pull-requests: write
+  issues: write
+  checks: write
+
+jobs:
+  preload:
+    name: 'Preload - Branch: ${{ github.ref_name }}'
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'create' && 
+      (startsWith(github.ref, 'refs/heads/support/') || startsWith(github.ref, 'refs/heads/release/')) ||
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    outputs:
+      is_release: ${{ steps.config.outputs.is_release }}
+      is_pre_release: ${{ steps.config.outputs.is_pre_release }}
+      deployment_name: ${{ steps.config.outputs.deployment_name }}
+      target_cloud: ${{ steps.config.outputs.target_cloud }}
+      deployment_enabled: ${{ steps.config.outputs.deployment_enabled }}
+      cloud: ${{ steps.config.outputs.cloud }}
+      cloud_type: ${{ steps.config.outputs.cloud_type }}
+      runner_set: ${{ steps.config.outputs.runner_set != '' && steps.config.outputs.runner_set || vars.DEPLOYMENT_RUNNER_SET }}
+      project_key: ${{ steps.config.outputs.project_key }}
+      project_owner: ${{ steps.config.outputs.project_owner }}
+      environment: ${{ steps.config.outputs.environment }}
+      android_sdks: ${{ steps.xconfig.outputs.android_sdks }}
+      android_destinations: ${{ steps.xconfig.outputs.android_destinations }}
+      android_configuration: ${{ steps.xconfig.outputs.android_configuration }}
+    steps:
+      - name: Checkout w/Blueprint
+        uses: cloudopsworks/blueprints/cd/checkout@v5.10
+        with:
+          blueprint_ref: 'v5.10'
+
+      - name: Pipeline Configuration
+        id: config
+        uses: ./bp/ci/config
+
+      - name: Android SDK Configuration
+        id: xconfig
+        uses: ./bp/ci/androidsdk/config
+        with:
+          environment: ${{ steps.config.outputs.environment }}
+
+  code-build:
+    name: 'Android Build - Branch: ${{ github.ref_name }}'
+    needs:
+      - preload
+    strategy:
+      matrix:
+        android_sdk: ${{ fromJSON(needs.preload.outputs.android_sdks) }}
+        android_destination: ${{ fromJSON(needs.preload.outputs.android_destinations) }}
+    runs-on: ${{ needs.preload.outputs.runner_set }}
+    outputs:
+      semver: ${{ steps.build.outputs.semver }}
+    steps:
+      - name: Checkout w/Blueprint
+        uses: cloudopsworks/blueprints/cd/checkout@v5.10
+        with:
+          blueprint_ref: 'v5.10'
+
+      - name: Android SDK Configuration
+        id: xconfig
+        uses: ./bp/ci/androidsdk/config
+        with:
+          environment: ${{ needs.preload.outputs.environment }}
+
+      - name: Build Android SDK Project
+        id: build
+        uses: ./bp/ci/androidsdk/build
+        with:
+          bot_user: ${{ vars.BOT_USER }}
+          token: ${{ secrets.BOT_TOKEN }}
+          project_key: ${{ needs.preload.outputs.project_key }}
+          android_version: ${{ steps.xconfig.outputs.android_version }}
+          android_sdk: ${{ matrix.android_sdk }}
+          android_destination: ${{ matrix.android_destination }}
+          android_extra_args: ${{ steps.xconfig.outputs.android_extra_args }}
+          android_extra_targets: ${{ steps.xconfig.outputs.android_extra_targets }}
+          android_configuration: ${{ steps.xconfig.outputs.android_configuration }}
+          android_packages: ${{ steps.xconfig.outputs.android_packages }}
+
+      - name: Save Build Artifacts
+        uses: ./bp/ci/androidsdk/artifacts
+        with:
+          android_sdk: ${{ matrix.android_sdk }}
+          android_destination: ${{ matrix.android_destination }}
+          android_configuration: ${{ steps.xconfig.outputs.android_configuration }}
+
+  release:
+    name: 'Generate Release'
+    needs:
+      - preload
+      - code-build
+    runs-on: ubuntu-latest
+    if: |
+      (! cancelled()) &&
+      (needs.preload.result == 'success') &&
+      (needs.preload.outputs.is_release == 'true') &&
+      (needs.preload.outputs.has_qualifier != 'true')
+    steps:
+      - name: Checkout w/Blueprint
+        uses: cloudopsworks/blueprints/cd/checkout@v5.10
+        id: co
+        with:
+          blueprint_ref: 'v5.10'
+
+      - name: Perform Release
+        uses: ./bp/cd/release
+        with:
+          source_path: ${{ steps.co.outputs.source_path }}
+          ref_name: ${{ needs.code-build.outputs.semver }}
+          release_tag: ${{ needs.code-build.outputs.semver }}
+          is_pre_release: ${{ needs.preload.outputs.is_pre_release == 'true' }}
+          files_globs: |
+            *.zip
+            *.jar
+          token: ${{ secrets.BOT_TOKEN }}
+
+  scan:
+    name: 'Code Scan SAST/SCA/DAST'
+    needs:
+      - preload
+      - code-build
+    if: |
+      (! cancelled()) && 
+      (needs.preload.result == 'success') &&
+      (needs.code-build.result == 'success')
+    uses: ./.github/workflows/scan.yml
+    with:
+      deployment_name: ${{ needs.preload.outputs.deployment_name }}
+      semver: ${{ needs.code-build.outputs.semver }}
+      bot_user: ${{ vars.BOT_USER }}
+      sonarqube_url: ${{ vars.SONARQUBE_URL }}
+      dtrack_url: ${{ vars.DEPENDENCYTRACK_URL }}
+      default_runner_set: ${{ vars.DEPLOYMENT_RUNNER_SET }}
+      environment: ${{ needs.preload.outputs.environment }}
+    secrets:
+      token: ${{ secrets.BOT_TOKEN }}
+      sonarqube_token: ${{ secrets.SONARQUBE_TOKEN }}
+      snyk_token: ${{ secrets.SNYK_TOKEN }}
+      semgrep_token: ${{ secrets.SEMGREP_TOKEN }}
+      dtrack_token: ${{ secrets.DEPENDENCYTRACK_TOKEN }}
+
+  deploy:
+    needs:
+      - preload
+      - code-build
+    if: |
+      (! cancelled()) &&
+      (needs.preload.result == 'success') &&
+      (needs.preload.outputs.deployment_enabled == 'true') &&
+      (needs.code-build.result == 'success')
+    strategy:
+      matrix:
+        android_sdk: ${{ fromJSON(needs.preload.outputs.android_sdks) }}
+        android_destination: ${{ fromJSON(needs.preload.outputs.android_destinations) }}
+    uses: ./.github/workflows/deploy.yml
+    with:
+      deployment_name: ${{ needs.preload.outputs.deployment_name }}
+      cloud: ${{ needs.preload.outputs.cloud }}
+      cloud_type: ${{ needs.preload.outputs.cloud_type }}
+      runner_set: ${{ needs.preload.outputs.runner_set }}
+      default_aws_region: ${{ vars.DEPLOYMENT_AWS_REGION }}
+      default_aws_sts_role_arn: ${{ vars.DEPLOYMENT_AWS_STS_ROLE_ARN }}
+      default_gcp_impersonate_sa: ${{ vars.DEPLOYMENT_GCP_IMPERSONATE_SA }}
+      default_gcp_project: ${{ vars.DEPLOYMENT_GCP_PROJECT }}
+      default_gcp_region: ${{ vars.DEPLOYMENT_GCP_REGION }}
+      default_azure_rg: ${{ vars.DEPLOYMENT_AZURE_RESOURCE_GROUP }}
+      terraform_state_conf: ${{ vars.DEPLOYMENT_STATE_CONF }}
+      semver: ${{ needs.code-build.outputs.semver }}
+      android_sdk: ${{ matrix.android_sdk }}
+      android_destination: ${{ matrix.android_destination }}
+      android_configuration: ${{ needs.preload.outputs.android_configuration }}
+    secrets:
+      token: ${{ secrets.BOT_TOKEN }}
+      aws_access_key_id: ${{ secrets.DEPLOYMENT_AWS_ACCESS_KEY_ID }}
+      aws_secret_access_key: ${{ secrets.DEPLOYMENT_AWS_SECRET_ACCESS_KEY }}
+      azure_service_id: ${{ secrets.DEPLOYMENT_AZURE_SERVICE_ID }}
+      azure_service_secret: ${{ secrets.DEPLOYMENT_AZURE_SERVICE_SECRET }}
+      gcp_credentials: ${{ secrets.DEPLOYMENT_GCP_CREDENTIALS }}
