@@ -79,9 +79,9 @@ jobs:
     steps:
       - name: Checkout w/Blueprint
         id: co
-        uses: cloudopsworks/blueprints/cd/checkout@feature/flutter-ci-actions
+        uses: cloudopsworks/blueprints/cd/checkout@v5.10.30
         with:
-          blueprint_ref: 'feature/flutter-ci-actions'
+          blueprint_ref: 'v5.10.30'
 
       - name: Pipeline Configuration
         id: config
@@ -111,9 +111,9 @@ jobs:
     runs-on: ${{ needs.preload.outputs.linux_runner_set }}
     steps:
       - name: Checkout w/Blueprint
-        uses: cloudopsworks/blueprints/cd/checkout@feature/flutter-ci-actions
+        uses: cloudopsworks/blueprints/cd/checkout@v5.10.30
         with:
-          blueprint_ref: 'feature/flutter-ci-actions'
+          blueprint_ref: 'v5.10.30'
 
       - name: Setup Flutter
         uses: ./bp/ci/flutter/setup
@@ -145,9 +145,9 @@ jobs:
     runs-on: ${{ matrix.runner_set }}
     steps:
       - name: Checkout w/Blueprint
-        uses: cloudopsworks/blueprints/cd/checkout@feature/flutter-ci-actions
+        uses: cloudopsworks/blueprints/cd/checkout@v5.10.30
         with:
-          blueprint_ref: 'feature/flutter-ci-actions'
+          blueprint_ref: 'v5.10.30'
 
       - name: Setup Flutter
         uses: ./bp/ci/flutter/setup
@@ -213,9 +213,9 @@ jobs:
       artifact_count: ${{ steps.assets.outputs.artifact_count }}
     steps:
       - name: Checkout w/Blueprint
-        uses: cloudopsworks/blueprints/cd/checkout@feature/flutter-ci-actions
+        uses: cloudopsworks/blueprints/cd/checkout@v5.10.30
         with:
-          blueprint_ref: 'feature/flutter-ci-actions'
+          blueprint_ref: 'v5.10.30'
 
       - name: Collect Release Assets
         id: assets
@@ -234,10 +234,10 @@ jobs:
       (needs.preload.outputs.has_qualifier != 'true')
     steps:
       - name: Checkout w/Blueprint
-        uses: cloudopsworks/blueprints/cd/checkout@feature/flutter-ci-actions
+        uses: cloudopsworks/blueprints/cd/checkout@v5.10.30
         id: co
         with:
-          blueprint_ref: 'feature/flutter-ci-actions'
+          blueprint_ref: 'v5.10.30'
 
       - name: Restore Release Assets
         uses: ./bp/ci/flutter/release-assets

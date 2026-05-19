@@ -127,9 +127,9 @@ jobs:
     environment: ${{ inputs.deployment_name }}
     steps:
       - name: Checkout w/Blueprint
-        uses: cloudopsworks/blueprints/cd/checkout@feature/flutter-ci-actions
+        uses: cloudopsworks/blueprints/cd/checkout@v5.10.30
         with:
-          blueprint_ref: 'feature/flutter-ci-actions'
+          blueprint_ref: 'v5.10.30'
 
       - name: Get Pipeline Config
         id: config

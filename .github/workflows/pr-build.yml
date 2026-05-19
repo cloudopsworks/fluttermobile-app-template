@@ -35,10 +35,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout w/Blueprint
-        uses: cloudopsworks/blueprints/cd/checkout@feature/flutter-ci-actions
+        uses: cloudopsworks/blueprints/cd/checkout@v5.10.30
         with:
           source_ref: ${{ github.head_ref }}
-          blueprint_ref: 'feature/flutter-ci-actions'
+          blueprint_ref: 'v5.10.30'
 
       - name: Pipeline Configuration
         id: config
@@ -87,10 +87,10 @@ jobs:
     steps:
       - name: Checkout w/Blueprint
         id: co
-        uses: cloudopsworks/blueprints/cd/checkout@feature/flutter-ci-actions
+        uses: cloudopsworks/blueprints/cd/checkout@v5.10.30
         with:
           source_ref: ${{ github.head_ref }}
-          blueprint_ref: 'feature/flutter-ci-actions'
+          blueprint_ref: 'v5.10.30'
 
       - name: Pipeline Configuration
         id: config
@@ -120,10 +120,10 @@ jobs:
     runs-on: ${{ needs.preload.outputs.linux_runner_set }}
     steps:
       - name: Checkout w/Blueprint
-        uses: cloudopsworks/blueprints/cd/checkout@feature/flutter-ci-actions
+        uses: cloudopsworks/blueprints/cd/checkout@v5.10.30
         with:
           source_ref: ${{ github.head_ref }}
-          blueprint_ref: 'feature/flutter-ci-actions'
+          blueprint_ref: 'v5.10.30'
 
       - name: Setup Flutter
         uses: ./bp/ci/flutter/setup
@@ -155,10 +155,10 @@ jobs:
     runs-on: ${{ matrix.runner_set }}
     steps:
       - name: Checkout w/Blueprint
-        uses: cloudopsworks/blueprints/cd/checkout@feature/flutter-ci-actions
+        uses: cloudopsworks/blueprints/cd/checkout@v5.10.30
         with:
           source_ref: ${{ github.head_ref }}
-          blueprint_ref: 'feature/flutter-ci-actions'
+          blueprint_ref: 'v5.10.30'
 
       - name: Setup Flutter
         uses: ./bp/ci/flutter/setup
