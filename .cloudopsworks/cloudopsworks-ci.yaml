@@ -7,7 +7,10 @@
 #     Distributed Under Apache v2.0 License
 #
 zipGlobs:
-  - "app/build/outputs/apk/{android_configuration}/*.apk"
+  - "build/app/outputs/flutter-apk/*.apk"
+  - "build/app/outputs/bundle/**/*.aab"
+  - "build/ios/ipa/*.ipa"
+  - "build/ios/smoke/*.zip"
 excludeGlobs:
   - Dockerfile
   - .helmignore

@@ -17,7 +17,6 @@ final ThemeData jetsnackTheme = ThemeData(
     primary: JetsnackColors.primary,
     secondary: JetsnackColors.secondary,
     surface: JetsnackColors.surface,
-    background: JetsnackColors.background,
   ),
   scaffoldBackgroundColor: JetsnackColors.background,
   appBarTheme: const AppBarTheme(

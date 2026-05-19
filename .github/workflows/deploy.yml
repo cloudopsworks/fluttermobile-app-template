@@ -1,15 +1,16 @@
 ##
-# (c) 2021-2025
+# (c) 2021-2026
 #     Cloud Ops Works LLC - https://cloudops.works/
-#     Find us on:
-#       GitHub: https://github.com/cloudopsworks
-#       WebSite: https://cloudops.works
 #     Distributed Under Apache v2.0 License
 #
 name: Continuous deployment to target environment
 on:
   workflow_call:
     inputs:
+      platform_type:
+        description: 'Mobile platform: android or ios'
+        required: true
+        type: string
       deployment_name:
         description: 'Deployment Name'
         required: true
@@ -19,7 +20,7 @@ on:
         required: true
         type: string
       cloud_type:
-        description: 'Cloud Type: kubernetes/eks/beanstalk/function etc.'
+        description: 'Cloud Type: device-farm etc.'
         required: true
         type: string
       runner_set:
@@ -65,17 +66,40 @@ on:
         type: string
         default: ''
       android_sdk:
-        description: 'Android SDK SDK to build and test'
-        required: true
+        description: 'Android SDK/build dimension'
+        required: false
         type: string
+        default: 'android'
       android_destination:
-        description: 'Android SDK Destination to build and test'
-        required: true
+        description: 'Android destination/build dimension'
+        required: false
         type: string
+        default: 'universal'
       android_configuration:
-        description: 'Android Configuration, debug, release, etc.'
-        required: true
+        description: 'Android configuration'
+        required: false
         type: string
+        default: 'Release'
+      xcode_version:
+        description: 'Xcode version'
+        required: false
+        type: string
+        default: ''
+      xcode_scheme:
+        description: 'Xcode scheme'
+        required: false
+        type: string
+        default: 'Runner'
+      xcode_sdk:
+        description: 'Xcode SDK'
+        required: false
+        type: string
+        default: 'iphoneos'
+      xcode_destination:
+        description: 'Xcode destination'
+        required: false
+        type: string
+        default: 'generic/platform=iOS'
     secrets:
       token:
         description: 'GitHub Token'
@@ -98,25 +122,37 @@ on:
 
 jobs:
   deploy-single:
-    name: 'Deploy - Branch: ${{ github.ref_name }} - Env: ${{ inputs.deployment_name }}'
+    name: 'Deploy ${{ inputs.platform_type }} - Branch: ${{ github.ref_name }} - Env: ${{ inputs.deployment_name }}'
     runs-on: ${{ inputs.runner_set }}
     environment: ${{ inputs.deployment_name }}
     steps:
       - name: Checkout w/Blueprint
-        uses: cloudopsworks/blueprints/cd/checkout@v5.10
+        uses: cloudopsworks/blueprints/cd/checkout@v5.10.30
         with:
-          blueprint_ref: 'v5.10'
+          blueprint_ref: 'v5.10.30'
 
-      # Get Pipeline Config
       - name: Get Pipeline Config
         id: config
         uses: ./bp/ci/config
+
+      - name: Validate mobile deployment support
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ inputs.cloud }}" == "AZURE" ]]; then
+            echo "::error::Azure mobile deployment is not supported until cd/deploy/mobile/azure exists in blueprints."
+            exit 1
+          fi
+          if [[ "${{ inputs.platform_type }}" != "android" && "${{ inputs.platform_type }}" != "ios" ]]; then
+            echo "::error::Unsupported platform_type: ${{ inputs.platform_type }}"
+            exit 1
+          fi
 
       - name: Deploy AWS
         if: ${{ inputs.cloud == 'AWS' }}
         uses: ./bp/cd/deploy/mobile/aws
         with:
-          platform_type: 'android'
+          platform_type: ${{ inputs.platform_type }}
           token: ${{ secrets.token }}
           aws_region: ${{ steps.config.outputs.aws_region != '' && steps.config.outputs.aws_region || inputs.default_aws_region }}
           aws_sts_role_arn: ${{ steps.config.outputs.deploy_aws_sts_role_arn != '' && steps.config.outputs.deploy_aws_sts_role_arn || inputs.default_aws_sts_role_arn }}
@@ -131,31 +167,16 @@ jobs:
           android_sdk: ${{ inputs.android_sdk }}
           android_destination: ${{ inputs.android_destination }}
           android_configuration: ${{ inputs.android_configuration }}
-
-      - name: Deploy Azure
-        if: ${{ inputs.cloud == 'AZURE' }}
-        uses: ./bp/cd/deploy/mobile/azure
-        with:
-          platform_type: 'android'
-          token: ${{ secrets.token }}
-          azure_service_id: ${{ secrets.azure_service_id }}
-          azure_service_secret: ${{ secrets.azure_service_secret }}
-          azure_rg: ${{ steps.config.outputs.build_azure_rg != '' && steps.config.outputs.build_azure_rg || inputs.default_azure_rg }}
-          terraform_state_conf: ${{ inputs.terraform_state_conf }}
-          release_name: ${{ steps.config.outputs.release_name }}
-          release_version: ${{ inputs.semver }}
-          project_key: ${{ steps.config.outputs.project_key }}
-          deployment_name: ${{ inputs.deployment_name }}
-          environment: ${{ steps.config.outputs.environment }}
-          android_sdk: ${{ inputs.android_sdk }}
-          android_destination: ${{ inputs.android_destination }}
-          android_configuration: ${{ inputs.android_configuration }}
+          xcode_version: ${{ inputs.xcode_version }}
+          xcode_scheme: ${{ inputs.xcode_scheme }}
+          xcode_sdk: ${{ inputs.xcode_sdk }}
+          xcode_destination: ${{ inputs.xcode_destination }}
 
       - name: Deploy GCP
         if: ${{ inputs.cloud == 'GCP' }}
         uses: ./bp/cd/deploy/mobile/gcp
         with:
-          platform_type: 'android'
+          platform_type: ${{ inputs.platform_type }}
           token: ${{ secrets.token }}
           gcp_credentials: ${{ secrets.gcp_credentials }}
           gcp_impersonate_sa: ${{ steps.config.outputs.deploy_gcp_impersonate_sa != '' && steps.config.outputs.deploy_gcp_impersonate_sa || inputs.default_gcp_impersonate_sa }}
@@ -170,3 +191,7 @@ jobs:
           android_sdk: ${{ inputs.android_sdk }}
           android_destination: ${{ inputs.android_destination }}
           android_configuration: ${{ inputs.android_configuration }}
+          xcode_version: ${{ inputs.xcode_version }}
+          xcode_scheme: ${{ inputs.xcode_scheme }}
+          xcode_sdk: ${{ inputs.xcode_sdk }}
+          xcode_destination: ${{ inputs.xcode_destination }}
