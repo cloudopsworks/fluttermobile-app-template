@@ -83,48 +83,6 @@ flutter:
       deployable_artifact_type: "ipa" # valid only when codesign=true and an IPA is produced.
 
 # -----------------------------------------------------------------------------
-# Compatibility aliases for existing mobile deployment/action contracts.
-# Keep these aligned with flutter.matrix.* until ./bp/ci/flutter/config fully
-# owns matrix/deploy artifact generation.
-# -----------------------------------------------------------------------------
-android:
-  version: "12266719" # Android command-line tools package revision.
-  #packages: "tools platform-tools"
-  configuration: "Release"
-  sdks:
-    - "android"
-  destinations:
-    - "universal"
-  #extra_args: ""
-  #extra_targets: "" # Optional test target args for device-farm/test-lab flows.
-
-xcode:
-  version: "16.4"
-  configuration: "Release"
-  extra_args: "-allowProvisioningUpdates"
-  build_for_testing: false
-  unsigned: true
-  # Signing fields are intentionally commented because unsigned smoke builds are
-  # the safe template default. Enable these only for signed IPA/release deploys.
-  #dev_team: "APPLE_TEAM_ID"
-  #product_bundle: "com.example.app"
-  export_options:
-    type: "ad_hoc"
-    method: "ad-hoc"
-    #profile: "PROFILENAME"
-    #signing_certificate: "Apple Distribution"
-    #app_url: "https://example.com/app/app.ipa"
-    #image_url: "https://www.cloudopsworks.co/image.57x57.png"
-    #full_image_url: "https://www.cloudopsworks.co/image.512x512.png"
-  schemes:
-    - "Runner"
-  sdks:
-    - "iphoneos"
-  destinations:
-    - "generic/platform=iOS"
-  #extra_targets: "" # Optional test target args for XCTest/UI-test device-farm flows.
-
-# -----------------------------------------------------------------------------
 # Optional security/quality integrations.
 # -----------------------------------------------------------------------------
 #snyk:
