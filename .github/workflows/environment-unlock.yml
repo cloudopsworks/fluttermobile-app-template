@@ -62,9 +62,9 @@ jobs:
       environment: ${{ steps.config.outputs.environment }}
     steps:
       - name: Checkout w/Blueprint
-        uses: cloudopsworks/blueprints/cd/checkout@v5.10
+        uses: cloudopsworks/blueprints/cd/checkout@v5.10.33
         with:
-          blueprint_ref: 'v5.10'
+          blueprint_ref: 'v5.10.33'
 
       - name: Pipeline Configuration
         id: config
@@ -78,9 +78,9 @@ jobs:
     environment: ${{ inputs.unlockDeploymentName }}
     steps:
       - name: Checkout w/Blueprint
-        uses: cloudopsworks/blueprints/cd/checkout@v5.10
+        uses: cloudopsworks/blueprints/cd/checkout@v5.10.33
         with:
-          blueprint_ref: 'v5.10'
+          blueprint_ref: 'v5.10.33'
 
       - name: Install runner tools
         uses: ./bp/ci/common/install/runner-tools
