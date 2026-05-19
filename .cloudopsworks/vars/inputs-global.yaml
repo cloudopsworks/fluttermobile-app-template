@@ -1,72 +1,170 @@
+# Global CI/CD variables for the Flutter mobile template.
+# Environment-specific files under .cloudopsworks/vars/inputs-<environment>.yaml
+# may override these values. The Flutter section below is the source of truth for
+# the future ./bp/ci/flutter/config action and is shaped to emit a GitHub Actions
+# matrix.include list for Android, iOS, or both in the same workflow.
+
 organization_name: "ORG_NAME"
 organization_unit: "ORG_UNIT"
 environment_name: "ENV_NAME"
 repository_owner: "REPO_OWNER" # Required
-#
-## Default Android SDK version is 16.0 (long number), uncomment to build with different, default dist is adopt, uncomment to use different dist
-## Refer to android sdk https://developer.android.com/studio#command-line-tools-only
+
+# -----------------------------------------------------------------------------
+# Flutter build configuration
+# -----------------------------------------------------------------------------
+flutter:
+  # SDK setup. Empty version means use the channel default or runner-installed
+  # default chosen by the Flutter setup blueprint.
+  channel: "stable"
+  version: ""
+  project_path: "."
+  target: "lib/main.dart"
+  build_mode: "release" # debug | profile | release
+
+  # Select build platforms. The Flutter config blueprint should convert this
+  # list plus the per-platform matrix settings into build_matrix.include rows.
+  # Remove "ios" for Android-only repositories or PR cost control.
+  platforms:
+    - android
+    - ios
+
+  quality:
+    pub_get: true
+    analyze: true
+    test: true
+    coverage: false
+    formatter_check: false
+
+  # Passed through as repeated --dart-define arguments by the build blueprint.
+  # Example:
+  # dart_defines:
+  #   - API_BASE_URL=https://api.example.com
+  dart_defines: []
+  extra_args: ""
+
+  # Matrix settings are intentionally not a Cartesian product between Android
+  # and iOS. The config blueprint should emit one include row per selected
+  # platform/device-output combination.
+  matrix:
+    fail_fast: false
+
+    # PR defaults may be overridden by environment files or workflow_dispatch.
+    pr:
+      include_android: true
+      include_ios: false # macOS runners are expensive; enable explicitly when needed.
+
+    android:
+      enabled: true
+      runner_set: "ubuntu-latest"
+      sdk: "android"
+      destination: "universal"
+      configuration: "Release"
+      artifact_types:
+        - apk
+        - appbundle
+      deployable_artifact_type: "apk" # device-farm deploy uses a single APK, not AAB.
+      split_per_abi: false
+      build_args: ""
+
+    ios:
+      enabled: true
+      runner_set: "macos-latest"
+      xcode_version: "16.4"
+      scheme: "Runner"
+      sdk: "iphoneos"
+      destination: "generic/platform=iOS"
+      configuration: "Release"
+      codesign: false # false creates unsigned smoke builds; true is required for IPA deploy.
+      unsigned: true
+      export_method: "ad-hoc"
+      export_options_plist: ""
+      build_for_testing: false
+      build_args: ""
+      deployable_artifact_type: "ipa" # valid only when codesign=true and an IPA is produced.
+
+# -----------------------------------------------------------------------------
+# Compatibility aliases for existing mobile deployment/action contracts.
+# Keep these aligned with flutter.matrix.* until ./bp/ci/flutter/config fully
+# owns matrix/deploy artifact generation.
+# -----------------------------------------------------------------------------
 android:
-  version: '12266719'                          # (optional) Android SDK Version to use, defaults to Android SDK 16.0 (long number: 12266719)
-  #packages: 'tools platform-tools'            # (optional) Android SDK Packages to install, defaults to tools & platform-tools
-  #extra_args: <extra arguments>
-  #extra_targets: <extra-targets parameters>   # (optional) Required if deploying to AWS Device Farm or Google Firebase Test Lab
+  version: "12266719" # Android command-line tools package revision.
+  #packages: "tools platform-tools"
+  configuration: "Release"
   sdks:
-    - 32
+    - "android"
   destinations:
-    - "Pixel 6"
-#    - platform=iOS Simulator,arch=arm64,OS=18.5,name=iPhone 16 Pro
-#    - platform=iOS Simulator,OS=18.2,name=iPhone 14 Pro
-#    - platform=iOS Simulator,OS=16.1,name=iPhone 14 Pro Max
-#    - platform=iOS Simulator,OS=17.2,name=iPhone 14 Pro Max
-#
-# Set Snyk processing to true if want to enable, the tool is disabled by default
+    - "universal"
+  #extra_args: ""
+  #extra_targets: "" # Optional test target args for device-farm/test-lab flows.
+
+xcode:
+  version: "16.4"
+  configuration: "Release"
+  extra_args: "-allowProvisioningUpdates"
+  build_for_testing: false
+  unsigned: true
+  # Signing fields are intentionally commented because unsigned smoke builds are
+  # the safe template default. Enable these only for signed IPA/release deploys.
+  #dev_team: "APPLE_TEAM_ID"
+  #product_bundle: "com.example.app"
+  export_options:
+    type: "ad_hoc"
+    method: "ad-hoc"
+    #profile: "PROFILENAME"
+    #signing_certificate: "Apple Distribution"
+    #app_url: "https://example.com/app/app.ipa"
+    #image_url: "https://www.cloudopsworks.co/image.57x57.png"
+    #full_image_url: "https://www.cloudopsworks.co/image.512x512.png"
+  schemes:
+    - "Runner"
+  sdks:
+    - "iphoneos"
+  destinations:
+    - "generic/platform=iOS"
+  #extra_targets: "" # Optional test target args for XCTest/UI-test device-farm flows.
+
+# -----------------------------------------------------------------------------
+# Optional security/quality integrations.
+# -----------------------------------------------------------------------------
 #snyk:
 #  enabled: true
-#
-# Set Semgrep processing to true if want to enable, the tool is disabled by default
+
 #semgrep:
 #  enabled: true
-#
-# Set Sonarqube processing to true if want to enable, the tool is disabled by default
+
 #sonarqube:
 #  enabled: true
 #  fail_on_quality_gate: true
-#  sources_path: "/"
-#  libraries_path: "**/node_modules/**/*"
-#  tests_path: "/"
-#  tests_inclusions: "**/test/**/*"
-#  tests_libraries: "**/node_modules/**/*"
-#  exclusions: "**/node_modules/**/*,"**/test/**/*"
-#  extra_exclusions:
-#  branch_disabled: true # uncomment only if you are using Community Sonarqube
-#
+#  sources_path: "lib"
+#  tests_path: "test"
+#  tests_inclusions: "test/**/*"
+#  exclusions: "build/**,.dart_tool/**,ios/Pods/**,android/.gradle/**"
+#  branch_disabled: true # use only for Community SonarQube.
+
 # JIRA Integration for Release Management
 #jira:
-#  enabled: true | false # Defaults to true, set to false to disable, JIRA_INTEGRATION_ENABLED at organization setting enables or disables globally
-#  project_id: "PROJECT ID NUMBER" # Optional, if not set will default to JIRA_INTEGRATION_PROJECT_ID from organization
-#  project_key: "PROJECT KEY" # Optional,  if not set will default to JIRA_INTEGRATION_PROJECT_KEY from organization
-#
-# Set DependencyTrack processing to false if want to disable, the tool is enabled by default
-# type: is one of => Library , Application , Container , Framework , Device , Firmware , File , Operating System
-#       Default type is Application
+#  enabled: true # JIRA_INTEGRATION_ENABLED at organization level can also control this.
+#  project_id: "PROJECT ID NUMBER"
+#  project_key: "PROJECT KEY"
+
+# DependencyTrack is enabled by default by organization policy unless disabled.
 #dependencyTrack:
 #  enabled: true
 #  type: Application
-#
-# Preview configuration, if enabled will create a preview environment for each PR
-#preview:
-#  enabled: true
-#  kubernetes: true
-#  domain: example.com
-#  azure:
-#    resource_group: PREVIEW_RG
-#  gcp:
-#    project_id: PREVIEW_PROJECT_ID
-#
-## CD pipeline configuration uncomment and configure accordingly to enable
-# Target Cloud
-cloud: aws | azure | gcp
-# Cloud deployment type depends on the target cloud
-cloud_type: device-farm
-# Indicate the Runner that will be used for the deployment - usually will be a hosted runner
+
+# -----------------------------------------------------------------------------
+# Preview configuration.
+# Mobile preview is intentionally disabled by default. The existing CloudOpsWorks
+# preview model is Kubernetes/container-oriented; define a mobile-specific
+# distribution/test-lab preview before enabling this for Flutter mobile apps.
+# -----------------------------------------------------------------------------
+preview:
+  enabled: false
+
+# -----------------------------------------------------------------------------
+# CD pipeline configuration. Uncomment/configure for deployment.
+# -----------------------------------------------------------------------------
+#cloud: "aws" # aws | azure | gcp
+#cloud_type: "device-farm"
 #runner_set: "ubuntu-latest"

@@ -1,16 +1,11 @@
 ##
-# (c) 2021-2025
+# (c) 2021-2026
 #     Cloud Ops Works LLC - https://cloudops.works/
-#     Find us on:
-#       GitHub: https://github.com/cloudopsworks
-#       WebSite: https://cloudops.works
 #     Distributed Under Apache v2.0 License
 #
 name: Release Build
 on:
-  # Run on create - but only on the support and release branches
   create:
-  # Run only on branches PUSH except when charts are modified
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
@@ -26,10 +21,14 @@ on:
       - '!.github/**'
       - '!.cloudopsworks/*'
   workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Optional comma-separated platform override: android,ios'
+        required: false
+        default: ''
 
 concurrency: build-${{ github.repository }}-${{ github.ref }}
 
-# Permission Settings for the entire RUN
 permissions:
   actions: write
   contents: write
@@ -44,14 +43,14 @@ jobs:
     name: 'Preload - Branch: ${{ github.ref_name }}'
     runs-on: ubuntu-latest
     if: |
-      github.event_name == 'create' && 
+      github.event_name == 'create' &&
       (startsWith(github.ref, 'refs/heads/support/') || startsWith(github.ref, 'refs/heads/release/')) ||
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     outputs:
       is_release: ${{ steps.config.outputs.is_release }}
       is_pre_release: ${{ steps.config.outputs.is_pre_release }}
+      has_qualifier: ${{ steps.config.outputs.has_qualifier }}
       deployment_name: ${{ steps.config.outputs.deployment_name }}
-      target_cloud: ${{ steps.config.outputs.target_cloud }}
       deployment_enabled: ${{ steps.config.outputs.deployment_enabled }}
       cloud: ${{ steps.config.outputs.cloud }}
       cloud_type: ${{ steps.config.outputs.cloud_type }}
@@ -59,113 +58,212 @@ jobs:
       project_key: ${{ steps.config.outputs.project_key }}
       project_owner: ${{ steps.config.outputs.project_owner }}
       environment: ${{ steps.config.outputs.environment }}
-      android_sdks: ${{ steps.xconfig.outputs.android_sdks }}
-      android_destinations: ${{ steps.xconfig.outputs.android_destinations }}
-      android_configuration: ${{ steps.xconfig.outputs.android_configuration }}
+      semver: ${{ steps.version.outputs.semver }}
+      flutter_channel: ${{ steps.flutter.outputs.flutter_channel }}
+      flutter_version: ${{ steps.flutter.outputs.flutter_version }}
+      flutter_project_path: ${{ steps.flutter.outputs.flutter_project_path }}
+      flutter_target: ${{ steps.flutter.outputs.flutter_target }}
+      flutter_build_mode: ${{ steps.flutter.outputs.flutter_build_mode }}
+      build_matrix: ${{ steps.flutter.outputs.build_matrix }}
+      deploy_matrix: ${{ steps.flutter.outputs.deploy_matrix }}
+      matrix_fail_fast: ${{ steps.flutter.outputs.matrix_fail_fast }}
+      quality_enabled: ${{ steps.flutter.outputs.quality_enabled }}
+      analyze_enabled: ${{ steps.flutter.outputs.analyze_enabled }}
+      test_enabled: ${{ steps.flutter.outputs.test_enabled }}
+      coverage_enabled: ${{ steps.flutter.outputs.coverage_enabled }}
+      formatter_check_enabled: ${{ steps.flutter.outputs.formatter_check_enabled }}
+      dart_defines_json: ${{ steps.flutter.outputs.dart_defines_json }}
+      flutter_extra_args: ${{ steps.flutter.outputs.flutter_extra_args }}
+      linux_runner_set: ${{ steps.flutter.outputs.linux_runner_set }}
+      macos_runner_set: ${{ steps.flutter.outputs.macos_runner_set }}
     steps:
       - name: Checkout w/Blueprint
-        uses: cloudopsworks/blueprints/cd/checkout@v5.10
+        id: co
+        uses: cloudopsworks/blueprints/cd/checkout@feature/flutter-ci-actions
         with:
-          blueprint_ref: 'v5.10'
+          blueprint_ref: 'feature/flutter-ci-actions'
 
       - name: Pipeline Configuration
         id: config
         uses: ./bp/ci/config
 
-      - name: Android SDK Configuration
-        id: xconfig
-        uses: ./bp/ci/androidsdk/config
+      - name: Flutter Configuration
+        id: flutter
+        uses: ./bp/ci/flutter/config
         with:
           environment: ${{ steps.config.outputs.environment }}
+          platform_override: ${{ github.event.inputs.platforms || '' }}
 
-  code-build:
-    name: 'Android Build - Branch: ${{ github.ref_name }}'
-    needs:
-      - preload
-    strategy:
-      matrix:
-        android_sdk: ${{ fromJSON(needs.preload.outputs.android_sdks) }}
-        android_destination: ${{ fromJSON(needs.preload.outputs.android_destinations) }}
-    runs-on: ${{ needs.preload.outputs.runner_set }}
-    outputs:
-      semver: ${{ steps.build.outputs.semver }}
+      - name: Resolve Version
+        id: version
+        shell: bash
+        working-directory: ${{ steps.co.outputs.source_path }}
+        run: |
+          set -euo pipefail
+          if [[ -f Makefile ]]; then make version >/tmp/flutter-version.log 2>&1 || cat /tmp/flutter-version.log; fi
+          if [[ -f VERSION ]]; then semver=$(tr -d '[:space:]' < VERSION); else semver=$(yq e '.version // "0.0.0+0"' pubspec.yaml | cut -d+ -f1); fi
+          echo "semver=$semver" >> "$GITHUB_OUTPUT"
+
+  quality:
+    name: 'Flutter Quality - Branch: ${{ github.ref_name }}'
+    needs: [preload]
+    if: ${{ needs.preload.outputs.quality_enabled == 'true' }}
+    runs-on: ${{ needs.preload.outputs.linux_runner_set }}
     steps:
       - name: Checkout w/Blueprint
-        uses: cloudopsworks/blueprints/cd/checkout@v5.10
+        uses: cloudopsworks/blueprints/cd/checkout@feature/flutter-ci-actions
         with:
-          blueprint_ref: 'v5.10'
+          blueprint_ref: 'feature/flutter-ci-actions'
 
-      - name: Android SDK Configuration
-        id: xconfig
-        uses: ./bp/ci/androidsdk/config
+      - name: Setup Flutter
+        uses: ./bp/ci/flutter/setup
         with:
-          environment: ${{ needs.preload.outputs.environment }}
+          flutter_channel: ${{ needs.preload.outputs.flutter_channel }}
+          flutter_version: ${{ needs.preload.outputs.flutter_version }}
+          platform_type: common
 
-      - name: Build Android SDK Project
+      - name: Run Quality Checks
+        uses: ./bp/ci/flutter/quality
+        with:
+          project_path: ${{ needs.preload.outputs.flutter_project_path }}
+          target: ${{ needs.preload.outputs.flutter_target }}
+          analyze_enabled: ${{ needs.preload.outputs.analyze_enabled }}
+          test_enabled: ${{ needs.preload.outputs.test_enabled }}
+          coverage_enabled: ${{ needs.preload.outputs.coverage_enabled }}
+          formatter_check_enabled: ${{ needs.preload.outputs.formatter_check_enabled }}
+
+  build:
+    name: 'Flutter ${{ matrix.platform_type }} Build - Branch: ${{ github.ref_name }}'
+    needs: [preload, quality]
+    if: |
+      (! cancelled()) &&
+      (needs.preload.result == 'success') &&
+      (needs.quality.result == 'success' || needs.quality.result == 'skipped')
+    strategy:
+      fail-fast: ${{ fromJSON(needs.preload.outputs.matrix_fail_fast) }}
+      matrix: ${{ fromJSON(needs.preload.outputs.build_matrix) }}
+    runs-on: ${{ matrix.runner_set }}
+    steps:
+      - name: Checkout w/Blueprint
+        uses: cloudopsworks/blueprints/cd/checkout@feature/flutter-ci-actions
+        with:
+          blueprint_ref: 'feature/flutter-ci-actions'
+
+      - name: Setup Flutter
+        uses: ./bp/ci/flutter/setup
+        with:
+          flutter_channel: ${{ needs.preload.outputs.flutter_channel }}
+          flutter_version: ${{ needs.preload.outputs.flutter_version }}
+          platform_type: ${{ matrix.platform_type }}
+
+      - name: Build Flutter Project
         id: build
-        uses: ./bp/ci/androidsdk/build
+        uses: ./bp/ci/flutter/build
         with:
           bot_user: ${{ vars.BOT_USER }}
           token: ${{ secrets.BOT_TOKEN }}
           project_key: ${{ needs.preload.outputs.project_key }}
-          android_version: ${{ steps.xconfig.outputs.android_version }}
-          android_sdk: ${{ matrix.android_sdk }}
-          android_destination: ${{ matrix.android_destination }}
-          android_extra_args: ${{ steps.xconfig.outputs.android_extra_args }}
-          android_extra_targets: ${{ steps.xconfig.outputs.android_extra_targets }}
-          android_configuration: ${{ steps.xconfig.outputs.android_configuration }}
-          android_packages: ${{ steps.xconfig.outputs.android_packages }}
+          semver_override: ${{ needs.preload.outputs.semver }}
+          project_path: ${{ needs.preload.outputs.flutter_project_path }}
+          platform_type: ${{ matrix.platform_type }}
+          flutter_target: ${{ needs.preload.outputs.flutter_target }}
+          flutter_build_mode: ${{ needs.preload.outputs.flutter_build_mode }}
+          dart_defines_json: ${{ needs.preload.outputs.dart_defines_json }}
+          flutter_extra_args: ${{ needs.preload.outputs.flutter_extra_args }}
+          android_artifact_types: ${{ toJSON(matrix.artifact_types) }}
+          android_split_per_abi: ${{ matrix.android_split_per_abi || 'false' }}
+          android_build_args: ${{ matrix.android_build_args || '' }}
+          android_sdk: ${{ matrix.android_sdk || 'android' }}
+          android_destination: ${{ matrix.android_destination || 'universal' }}
+          ios_codesign: ${{ matrix.ios_codesign || 'false' }}
+          ios_export_method: ${{ matrix.ios_export_method || 'ad-hoc' }}
+          ios_export_options_plist: ${{ matrix.ios_export_options_plist || '' }}
+          ios_scheme: ${{ matrix.xcode_scheme || 'Runner' }}
+          ios_sdk: ${{ matrix.xcode_sdk || 'iphoneos' }}
+          ios_destination: ${{ matrix.xcode_destination || 'generic/platform=iOS' }}
+          ios_configuration: ${{ matrix.xcode_configuration || 'Release' }}
+          build_certificate_b64: ${{ secrets.XCODE_BUILD_CERTIFICATE_BASE64 }}
+          build_certificate_pass: ${{ secrets.XCODE_BUILD_CERTIFICATE_PASS }}
+          build_provision_profile_b64: ${{ secrets.XCODE_PROVISION_PROFILE_BASE64 }}
+          keychain_password: ${{ secrets.XCODE_KEYCHAIN_PASSWORD }}
+          build_export_options_plist: ${{ secrets.XCODE_EXPORT_OPTIONS_PLIST }}
 
       - name: Save Build Artifacts
-        uses: ./bp/ci/androidsdk/artifacts
+        uses: ./bp/ci/flutter/artifacts
         with:
-          android_sdk: ${{ matrix.android_sdk }}
-          android_destination: ${{ matrix.android_destination }}
-          android_configuration: ${{ steps.xconfig.outputs.android_configuration }}
+          project_path: ${{ needs.preload.outputs.flutter_project_path }}
+          platform_type: ${{ matrix.platform_type }}
+          artifact_paths_json: ${{ steps.build.outputs.artifact_paths_json }}
+          workflow_artifact_name: ${{ steps.build.outputs.workflow_artifact_name }}
+          target_artifact_name: ${{ steps.build.outputs.target_artifact_name }}
+          artifact_manifest_path: ${{ steps.build.outputs.artifact_manifest_path }}
 
-  release:
-    name: 'Generate Release'
-    needs:
-      - preload
-      - code-build
+  release-assets:
+    name: 'Collect Flutter Release Assets'
+    needs: [preload, build]
     runs-on: ubuntu-latest
     if: |
       (! cancelled()) &&
       (needs.preload.result == 'success') &&
+      (needs.build.result == 'success') &&
+      (needs.preload.outputs.is_release == 'true') &&
+      (needs.preload.outputs.has_qualifier != 'true')
+    outputs:
+      files_globs: ${{ steps.assets.outputs.files_globs }}
+      artifact_count: ${{ steps.assets.outputs.artifact_count }}
+    steps:
+      - name: Checkout w/Blueprint
+        uses: cloudopsworks/blueprints/cd/checkout@feature/flutter-ci-actions
+        with:
+          blueprint_ref: 'feature/flutter-ci-actions'
+
+      - name: Collect Release Assets
+        id: assets
+        uses: ./bp/ci/flutter/release-assets
+
+  release:
+    name: 'Generate Release'
+    needs: [preload, build, release-assets]
+    runs-on: ubuntu-latest
+    if: |
+      (! cancelled()) &&
+      (needs.preload.result == 'success') &&
+      (needs.build.result == 'success') &&
+      (needs.release-assets.result == 'success') &&
       (needs.preload.outputs.is_release == 'true') &&
       (needs.preload.outputs.has_qualifier != 'true')
     steps:
       - name: Checkout w/Blueprint
-        uses: cloudopsworks/blueprints/cd/checkout@v5.10
+        uses: cloudopsworks/blueprints/cd/checkout@feature/flutter-ci-actions
         id: co
         with:
-          blueprint_ref: 'v5.10'
+          blueprint_ref: 'feature/flutter-ci-actions'
+
+      - name: Restore Release Assets
+        uses: ./bp/ci/flutter/release-assets
+        id: assets
 
       - name: Perform Release
         uses: ./bp/cd/release
         with:
           source_path: ${{ steps.co.outputs.source_path }}
-          ref_name: ${{ needs.code-build.outputs.semver }}
-          release_tag: ${{ needs.code-build.outputs.semver }}
+          ref_name: ${{ needs.preload.outputs.semver }}
+          release_tag: ${{ needs.preload.outputs.semver }}
           is_pre_release: ${{ needs.preload.outputs.is_pre_release == 'true' }}
-          files_globs: |
-            *.zip
-            *.jar
+          files_globs: ${{ steps.assets.outputs.files_globs }}
           token: ${{ secrets.BOT_TOKEN }}
 
   scan:
     name: 'Code Scan SAST/SCA/DAST'
-    needs:
-      - preload
-      - code-build
+    needs: [preload, build]
     if: |
-      (! cancelled()) && 
+      (! cancelled()) &&
       (needs.preload.result == 'success') &&
-      (needs.code-build.result == 'success')
+      (needs.build.result == 'success')
     uses: ./.github/workflows/scan.yml
     with:
       deployment_name: ${{ needs.preload.outputs.deployment_name }}
-      semver: ${{ needs.code-build.outputs.semver }}
+      semver: ${{ needs.preload.outputs.semver }}
       bot_user: ${{ vars.BOT_USER }}
       sonarqube_url: ${{ vars.SONARQUBE_URL }}
       dtrack_url: ${{ vars.DEPENDENCYTRACK_URL }}
@@ -179,24 +277,22 @@ jobs:
       dtrack_token: ${{ secrets.DEPENDENCYTRACK_TOKEN }}
 
   deploy:
-    needs:
-      - preload
-      - code-build
+    needs: [preload, build]
     if: |
       (! cancelled()) &&
       (needs.preload.result == 'success') &&
       (needs.preload.outputs.deployment_enabled == 'true') &&
-      (needs.code-build.result == 'success')
+      (needs.build.result == 'success')
     strategy:
-      matrix:
-        android_sdk: ${{ fromJSON(needs.preload.outputs.android_sdks) }}
-        android_destination: ${{ fromJSON(needs.preload.outputs.android_destinations) }}
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.preload.outputs.deploy_matrix) }}
     uses: ./.github/workflows/deploy.yml
     with:
+      platform_type: ${{ matrix.platform_type }}
       deployment_name: ${{ needs.preload.outputs.deployment_name }}
       cloud: ${{ needs.preload.outputs.cloud }}
       cloud_type: ${{ needs.preload.outputs.cloud_type }}
-      runner_set: ${{ needs.preload.outputs.runner_set }}
+      runner_set: ${{ matrix.runner_set }}
       default_aws_region: ${{ vars.DEPLOYMENT_AWS_REGION }}
       default_aws_sts_role_arn: ${{ vars.DEPLOYMENT_AWS_STS_ROLE_ARN }}
       default_gcp_impersonate_sa: ${{ vars.DEPLOYMENT_GCP_IMPERSONATE_SA }}
@@ -204,10 +300,14 @@ jobs:
       default_gcp_region: ${{ vars.DEPLOYMENT_GCP_REGION }}
       default_azure_rg: ${{ vars.DEPLOYMENT_AZURE_RESOURCE_GROUP }}
       terraform_state_conf: ${{ vars.DEPLOYMENT_STATE_CONF }}
-      semver: ${{ needs.code-build.outputs.semver }}
-      android_sdk: ${{ matrix.android_sdk }}
-      android_destination: ${{ matrix.android_destination }}
-      android_configuration: ${{ needs.preload.outputs.android_configuration }}
+      semver: ${{ needs.preload.outputs.semver }}
+      android_sdk: ${{ matrix.android_sdk || 'android' }}
+      android_destination: ${{ matrix.android_destination || 'universal' }}
+      android_configuration: ${{ matrix.android_configuration || 'Release' }}
+      xcode_scheme: ${{ matrix.xcode_scheme || 'Runner' }}
+      xcode_sdk: ${{ matrix.xcode_sdk || 'iphoneos' }}
+      xcode_destination: ${{ matrix.xcode_destination || 'generic/platform=iOS' }}
+      xcode_version: ${{ matrix.xcode_version || '' }}
     secrets:
       token: ${{ secrets.BOT_TOKEN }}
       aws_access_key_id: ${{ secrets.DEPLOYMENT_AWS_ACCESS_KEY_ID }}

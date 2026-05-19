@@ -89,9 +89,9 @@ jobs:
       quality_gate_enabled: ${{ steps.config.outputs.quality_gate_enabled }}
     steps:
       - name: Checkout w/Blueprint
-        uses: cloudopsworks/blueprints/cd/checkout@v5.10
+        uses: cloudopsworks/blueprints/cd/checkout@feature/flutter-ci-actions
         with:
-          blueprint_ref: 'v5.10'
+          blueprint_ref: 'feature/flutter-ci-actions'
 
       - name: Pipeline Configuration
         id: config
@@ -108,14 +108,14 @@ jobs:
       SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_TOKEN }}
     steps:
       - name: Checkout w/Blueprint
-        uses: cloudopsworks/blueprints/cd/checkout@v5.10
+        uses: cloudopsworks/blueprints/cd/checkout@feature/flutter-ci-actions
         id: co
         with:
-          blueprint_ref: 'v5.10'
+          blueprint_ref: 'feature/flutter-ci-actions'
 
       - name: Semgrep Scan
         if: ${{ needs.preload.outputs.semgrep_enabled == 'true' }}
-        uses: ./bp/ci/androidsdk/scan/semgrep
+        uses: ./bp/ci/flutter/scan/semgrep
         continue-on-error: true
         with:
           source_path: ${{ steps.co.outputs.source_path }}
@@ -131,14 +131,14 @@ jobs:
     runs-on: ${{ needs.preload.outputs.runner_set }}
     steps:
       - name: Checkout w/Blueprint
-        uses: cloudopsworks/blueprints/cd/checkout@v5.10
+        uses: cloudopsworks/blueprints/cd/checkout@feature/flutter-ci-actions
         id: co
         with:
-          blueprint_ref: 'v5.10'
+          blueprint_ref: 'feature/flutter-ci-actions'
 
       - name: Snyk Scan
         if: ${{ needs.preload.outputs.snyk_enabled == 'true' }}
-        uses: ./bp/ci/androidsdk/scan/snyk
+        uses: ./bp/ci/flutter/scan/snyk
         continue-on-error: true
         with:
           source_path: ${{ steps.co.outputs.source_path }}
@@ -149,7 +149,7 @@ jobs:
 
       - name: SonarQube Scan
         if: ${{ needs.preload.outputs.sonarqube_enabled == 'true' }}
-        uses: ./bp/ci/androidsdk/scan/sonarqube
+        uses: ./bp/ci/flutter/scan/sonarqube
         continue-on-error: true
         with:
           source_path: ${{ steps.co.outputs.source_path }}
@@ -171,7 +171,7 @@ jobs:
 
       - name: Dependency track Scan
         if: ${{ needs.preload.outputs.dtrack_enabled == 'true' }}
-        uses: ./bp/ci/androidsdk/scan/dtrack
+        uses: ./bp/ci/flutter/scan/dtrack
         continue-on-error: true
         with:
           source_path: ${{ steps.co.outputs.source_path }}
@@ -181,10 +181,4 @@ jobs:
           dtrack_project_key: ${{ needs.preload.outputs.project_key }}
           project_type: ${{ needs.preload.outputs.dtrack_project_type }}
           semver: ${{ inputs.semver }}
-
-      - name: Upload Artifacts
-        uses: ./bp/ci/androidsdk/test/artifacts
-        with:
-          bot_user: ${{ inputs.bot_user }}
-          token: ${{ secrets.token }}
 
