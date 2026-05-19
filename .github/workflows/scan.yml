@@ -89,9 +89,9 @@ jobs:
       quality_gate_enabled: ${{ steps.config.outputs.quality_gate_enabled }}
     steps:
       - name: Checkout w/Blueprint
-        uses: cloudopsworks/blueprints/cd/checkout@v5.10.39
+        uses: cloudopsworks/blueprints/cd/checkout@v5.10
         with:
-          blueprint_ref: 'v5.10.39'
+          blueprint_ref: 'v5.10'
 
       - name: Pipeline Configuration
         id: config
@@ -108,10 +108,10 @@ jobs:
       SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_TOKEN }}
     steps:
       - name: Checkout w/Blueprint
-        uses: cloudopsworks/blueprints/cd/checkout@v5.10.39
+        uses: cloudopsworks/blueprints/cd/checkout@v5.10
         id: co
         with:
-          blueprint_ref: 'v5.10.39'
+          blueprint_ref: 'v5.10'
 
       - name: Semgrep Scan
         if: ${{ needs.preload.outputs.semgrep_enabled == 'true' }}
@@ -131,10 +131,10 @@ jobs:
     runs-on: ${{ needs.preload.outputs.runner_set }}
     steps:
       - name: Checkout w/Blueprint
-        uses: cloudopsworks/blueprints/cd/checkout@v5.10.39
+        uses: cloudopsworks/blueprints/cd/checkout@v5.10
         id: co
         with:
-          blueprint_ref: 'v5.10.39'
+          blueprint_ref: 'v5.10'
 
       - name: Snyk Scan
         if: ${{ needs.preload.outputs.snyk_enabled == 'true' }}
