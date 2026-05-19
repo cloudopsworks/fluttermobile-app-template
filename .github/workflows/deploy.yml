@@ -127,9 +127,9 @@ jobs:
     environment: ${{ inputs.deployment_name }}
     steps:
       - name: Checkout w/Blueprint
-        uses: cloudopsworks/blueprints/cd/checkout@v5.10.35
+        uses: cloudopsworks/blueprints/cd/checkout@v5.10.36
         with:
-          blueprint_ref: 'v5.10.35'
+          blueprint_ref: 'v5.10.36'
 
       - name: Get Pipeline Config
         id: config
