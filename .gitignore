@@ -8,6 +8,8 @@
 #
 
 # Log file
+log
+logs
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -114,3 +116,11 @@ ios/Runner/GeneratedPluginRegistrant.*
 **/ios/**/*.perspectivev3
 **/ios/**/xcuserdata/
 **/ios/**/DerivedData/
+
+### AI Agents ###
+.claude/
+.gstack/
+.opencode/
+.omc/
+.omx/
+.ai/
