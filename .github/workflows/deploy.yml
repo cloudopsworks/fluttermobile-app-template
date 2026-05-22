@@ -137,14 +137,17 @@ jobs:
 
       - name: Validate mobile deployment support
         shell: bash
+        env:
+          INPUT_CLOUD: ${{ inputs.cloud }}
+          INPUT_PLATFORM_TYPE: ${{ inputs.platform_type }}
         run: |
           set -euo pipefail
-          if [[ "${{ inputs.cloud }}" == "AZURE" ]]; then
+          if [[ "$INPUT_CLOUD" == "AZURE" ]]; then
             echo "::error::Azure mobile deployment is not supported until cd/deploy/mobile/azure exists in blueprints."
             exit 1
           fi
-          if [[ "${{ inputs.platform_type }}" != "android" && "${{ inputs.platform_type }}" != "ios" ]]; then
-            echo "::error::Unsupported platform_type: ${{ inputs.platform_type }}"
+          if [[ "$INPUT_PLATFORM_TYPE" != "android" && "$INPUT_PLATFORM_TYPE" != "ios" ]]; then
+            echo "::error::Unsupported platform_type: $INPUT_PLATFORM_TYPE"
             exit 1
           fi
 
