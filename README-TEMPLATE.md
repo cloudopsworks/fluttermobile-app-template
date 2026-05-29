@@ -847,19 +847,34 @@ flutter build ios --release --no-codesign
 
 ## Upgrade Procedure
 
-Keep derived repositories synchronized with the latest template patch:
+Repositories derived from this template stay in sync with upstream releases using the
+`make repos/upgrade*` targets. An agent asked to "upgrade", "update from template",
+"sync with template", "apply template changes", or "bump template version" should use
+these targets — never fetch or apply template changes manually.
 
-```bash
-make repos/upgrade
-```
+### Available upgrade targets
 
-**What it does:**
+| Target | When to use |
+|---|---|
+| `make repos/upgrade` | **Default — patch upgrade.** Pulls the latest patch within the **same minor version**. No breaking changes. Use for routine maintenance. |
+| `make repos/upgrade/major` | Pulls the latest release within the **same major version**. May include workflow-level changes. |
+| `make repos/upgrade/master` | Pulls from the template's `master` branch tip. Use only when explicitly asked to track the latest unreleased template state. |
+| `make repos/upgrade/dev` | Pulls from the template's `develop` branch. Use only for pre-release or preview upgrades. |
+| `make repos/available` | Lists the latest available patch and major versions without modifying anything. Run this first to see what is available. |
+
+### What the upgrade does
+
 - Updates `.cloudopsworks/_VERSION` to the latest compatible template tag
 - Refreshes `.github/workflows/` from the template
 - Refreshes `Makefile` and selected Cloud Ops Works metadata
 - **Preserves** `lib/`, `test/`, `android/`, `ios/` (application source is never overwritten)
 
-**Validate after upgrading:**
+### Upgrade workflow for agents
+
+1. Run `make repos/available` to see the current and latest available versions.
+2. Choose the appropriate target (default: `make repos/upgrade` for a routine patch upgrade).
+3. Review the diff — the upgrade overwrites `.github/workflows/` and selected `.cloudopsworks/` metadata; application source files are never touched.
+4. Validate after upgrading:
 
 ```bash
 # 1. Verify all YAML is parseable
@@ -872,12 +887,12 @@ grep -R "cloudopsworks/blueprints/cd/checkout@v5.10" .github/workflows
 flutter pub get && flutter analyze && flutter test
 ```
 
-**Commit the upgrade:**
+5. Commit the result with: `chore: upgrade from fluttermobile template <old-version> → <new-version> +semver: patch`
+6. Use `/cw-release` to create and merge the hotfix PR (see [Release Workflow — use `cw-release`](#release-workflow--use-cw-release)).
 
-```bash
-git add .cloudopsworks/_VERSION .github/workflows/ Makefile
-git commit -m "chore: upgrade from fluttermobile template v1.0.10 +semver: patch"
-```
+> **Note:** `Makefile`, `.github/`, `.cloudopsworks/labeler.yml`, `.cloudopsworks/Makefile`,
+> and `.cloudopsworks/LICENSE` are owned by the template and will be overwritten on every upgrade.
+> Do not edit these files manually in derived repositories.
 
 ---
 
