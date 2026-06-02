@@ -985,6 +985,37 @@ flutter pub get && flutter analyze && flutter test
 
 ---
 
+## Upgrading from the Template
+
+Repositories derived from this template stay in sync with upstream releases using the
+`make repos/upgrade*` targets. An agent asked to "upgrade", "update from template",
+"sync with template", "apply template changes", or "bump template version" should use
+these targets — never fetch or apply template changes manually.
+
+### Available upgrade targets
+
+| Target | When to use |
+|---|---|
+| `make repos/upgrade` | **Default — patch upgrade.** Pulls the latest patch within the **same minor version**. No breaking changes. Use for routine maintenance. |
+| `make repos/upgrade/major` | Pulls the latest release within the **same major version**. May include workflow-level changes. |
+| `make repos/upgrade/master` | Pulls from the template's `master` branch tip. Use only when explicitly asked to track the latest unreleased template state. |
+| `make repos/upgrade/dev` | Pulls from the template's `develop` branch. Use only for pre-release or preview upgrades. |
+| `make repos/available` | Lists the latest available patch and major versions without modifying anything. Run this first to see what is available. |
+
+### Upgrade workflow for agents
+
+1. Run `make repos/available` to see the current and latest available versions.
+2. Choose the appropriate target (default: `make repos/upgrade` for a routine patch upgrade).
+3. Review the diff — the upgrade overwrites `.github/workflows/` and selected `.cloudopsworks/` metadata; application source files are never touched.
+4. Commit the result with: `chore: upgrade from <template-name> <old-version> → <new-version> +semver: patch`
+5. Use `/cw-release` to create and merge the hotfix PR (see [Release Workflow — use `cw-release`](#release-workflow--use-cw-release)).
+
+> **Note:** `Makefile`, `.github/`, `.cloudopsworks/labeler.yml`, `.cloudopsworks/Makefile`,
+> and `.cloudopsworks/LICENSE` are owned by the template and will be overwritten on every upgrade.
+> Do not edit these files manually in derived repositories.
+
+---
+
 ## AI-assisted upgrade of `.cloudopsworks/vars` configuration files
 
 This section is a machine-readable protocol for AI agents performing a seamless, non-destructive upgrade of all configuration files under `.cloudopsworks/vars/` when a new template version is released. Follow the steps below in order.
@@ -999,7 +1030,7 @@ An upgrade merges new keys, updated comments, and structural changes from the up
 
 ### Step 1 — determine current and target versions
 
-1. Read `.cloudopsworks/_VERSION` to get the **current locked version** (e.g., `v1.4.15`).
+1. Read `.cloudopsworks/_VERSION` to get the **current locked version** (e.g., `v1.0.15`).
 2. The **target version** is either supplied by the operator or is the latest release tag on `cloudopsworks/fluttermobile-app-template`.
 3. Fetch any upstream file from GitHub using the pattern:
    ```
@@ -1007,7 +1038,7 @@ An upgrade merges new keys, updated comments, and structural changes from the up
    ```
    Example:
    ```
-   https://raw.githubusercontent.com/cloudopsworks/fluttermobile-app-template/v1.4.15/.cloudopsworks/vars/inputs-global.yaml
+   https://raw.githubusercontent.com/cloudopsworks/fluttermobile-app-template/v1.0.15/.cloudopsworks/vars/inputs-global.yaml
    ```
 
 ---
@@ -1081,7 +1112,7 @@ Apply the merge rules from Step 4 to every file in the following subdirectories,
 
 ### Step 6 — update `_VERSION`
 
-After all merges are verified correct, write the target version string (e.g., `v1.4.16`) to `.cloudopsworks/_VERSION`. This is the final step.
+After all merges are verified correct, write the target version string (e.g., `v1.0.16`) to `.cloudopsworks/_VERSION`. This is the final step.
 
 ---
 
