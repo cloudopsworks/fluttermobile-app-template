@@ -1,3 +1,4 @@
+# BEGIN TRONADOR TEMPLATE MANAGED BLOCK
 ##
 # (c) 2021-2025
 #     Cloud Ops Works LLC - https://cloudops.works/
@@ -125,3 +126,4 @@ ios/Runner/GeneratedPluginRegistrant.*
 .omx/
 .ai/
 omx_wiki/
+# END TRONADOR TEMPLATE MANAGED BLOCK
