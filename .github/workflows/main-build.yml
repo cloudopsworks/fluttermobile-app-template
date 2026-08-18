@@ -277,6 +277,7 @@ jobs:
       dtrack_token: ${{ secrets.DEPENDENCYTRACK_TOKEN }}
 
   deploy:
+    name: Deploy Application
     needs: [preload, build]
     if: |
       (! cancelled()) &&
