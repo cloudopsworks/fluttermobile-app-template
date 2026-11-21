@@ -127,8 +127,8 @@ flutter:
 #
 ## CD pipeline configuration uncomment and configure accordingly to enable
 # Target Cloud
-cloud: aws | azure | gcp
-# Cloud deployment type always is device-farm
+cloud: aws # Use gcp instead for Firebase Test Lab.
+# Set cloud_type when enabling deployment: device-farm for AWS, firebase-test-lab for GCP.
 #cloud_type: "device-farm"
 # Indicate the Runner that will be used for the deployment - usually will be a hosted runner
 # runner_set: "arc-runner-set"
