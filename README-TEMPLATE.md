@@ -2,8 +2,8 @@
 
 ## Agent command policy
 
-The `Makefile` remains for compatibility, but direct Make invocation is deprecated
-for README and Git-flow/version operations. Agents must use the Tronador CLI:
+Use the Tronador CLI (`tronador-cli`, executable `tronador`) directly for
+project setup, documentation, template upgrades, and version operations:
 
 - Run `tronador readme build` to render README output. If committed target/dependency
   documentation also needs refresh, run `tronador docs targets` first.
@@ -71,9 +71,14 @@ documentation; keep this file as the operational reference.
 | GitHub Actions workflows | PR validation, release builds, deploys, scans, ownership, JIRA, cleanup |
 | Matrix builds | Android APK/AAB and signed or unsigned iOS from one workflow dispatch |
 | Device-farm deploy | AWS Device Farm and GCP Firebase Test Lab |
-| GitVersion + Tronador | Semantic versioning helpers via `Makefile` |
+| GitVersion + Tronador | Semantic versioning via `tronador versions` |
 | Security integrations | Optional Snyk, Semgrep, SonarQube, DependencyTrack hooks |
-| Template marker | `.cloudopsworks/.fluttermobile` consumed by `cd/checkout/check-module-version` |
+| Template marker | `.cloudopsworks/.flutter` consumed by `cd/checkout/check-module-version` |
+
+Keep both marker files. Blueprints checkout and guarded version generation use
+`.cloudopsworks/.flutter`. Tronador CLI 0.6.1 still needs
+`.cloudopsworks/.fluttermobile` for `tronador project detect` and `tronador project init`.
+Remove the compatibility marker only when the minimum supported CLI recognizes `.flutter` for both commands.
 
 ---
 
@@ -82,11 +87,11 @@ documentation; keep this file as the operational reference.
 ```
 .
 ├── .cloudopsworks/
-│   ├── .fluttermobile          # Marker: identifies this as a Flutter mobile template repo
+│   ├── .flutter                # Canonical template and release marker
+│   ├── .fluttermobile          # Compatibility marker for Tronador CLI 0.6.1
 │   ├── _VERSION                # Last template version applied (managed by tronador repos upgrade)
 │   ├── cloudopsworks-ci.yaml   # Branch protection, GitFlow, CD deployment triggers
 │   ├── labeler.yml             # PR label rules for platform workflows
-│   ├── Makefile                # Cloud Ops Works helper targets
 │   └── vars/
 │       ├── inputs-global.yaml  # Primary config: Flutter build matrix, quality, cloud
 │       ├── inputs-dev.yaml     # Dev environment overrides and device-farm settings
@@ -108,14 +113,14 @@ documentation; keep this file as the operational reference.
 ├── ios/                        # Flutter iOS platform project
 ├── lib/                        # Flutter/Dart application source
 ├── test/                       # Flutter tests
-├── Makefile                    # Project init and version helpers (do not modify)
+├── Makefile                    # Legacy compatibility file (do not modify)
 ├── pubspec.yaml                # Package name, dependencies, version
 ├── README.md                   # Replace with product-specific documentation
 └── README-TEMPLATE.md          # This file — template operational guide
 ```
 
 > **Protected:** `Makefile`, `.github/`, `.cloudopsworks/labeler.yml`,
-> `.cloudopsworks/Makefile`, `.cloudopsworks/LICENSE` — do not edit these manually.
+> `.cloudopsworks/LICENSE` — do not edit these manually.
 
 ---
 
@@ -273,6 +278,14 @@ grep -R "blueprint_ref:" .github/workflows
 Both commands must return only `v5.10` references.
 
 ---
+
+## Artifact packaging
+
+The default `zipGlobs` (files to package) and `excludeGlobs` (files to leave out)
+have moved to [`cloudopsworks/blueprints/artifacts/config/flutter.yaml`](https://github.com/cloudopsworks/blueprints/blob/v5.10/artifacts/config/flutter.yaml).
+Remove both keys from `.cloudopsworks/cloudopsworks-ci.yaml`. To add project-specific
+patterns, set either key as a top-level list in `.cloudopsworks/vars/inputs-global.yaml`.
+Each list is merged with its blueprint defaults; omit both to use the defaults unchanged.
 
 ## Configuration Reference — inputs-global.yaml
 
@@ -921,7 +934,7 @@ flutter pub get && flutter analyze && flutter test
 5. Commit the result with: `chore: upgrade from fluttermobile template <old-version> → <new-version> +semver: patch`
 6. Use `/cw-release` to create and merge the hotfix PR (see [Release Workflow — use `cw-release`](#release-workflow--use-cw-release)).
 
-> **Note:** `Makefile`, `.github/`, `.cloudopsworks/labeler.yml`, `.cloudopsworks/Makefile`,
+> **Note:** `Makefile`, `.github/`, `.cloudopsworks/labeler.yml`,
 > and `.cloudopsworks/LICENSE` are owned by the template and will be overwritten on every upgrade.
 > Do not edit these files manually in derived repositories.
 
@@ -936,7 +949,7 @@ flutter pub get && flutter analyze && flutter test
 - The checkout action attempts to query `https://github.com/.git`
 
 **Checks:**
-1. Confirm `.cloudopsworks/.fluttermobile` exists in the repository root
+1. Confirm `.cloudopsworks/.flutter` exists in the repository root
 2. Confirm all workflows use `cloudopsworks/blueprints/cd/checkout@v5.10`
 3. Confirm `blueprint_ref: v5.10` appears in workflow inputs
 
@@ -1041,7 +1054,7 @@ these commands — never fetch or apply template changes manually.
 4. Commit the result with: `chore: upgrade from <template-name> <old-version> → <new-version> +semver: patch`
 5. Use `/cw-release` to create and merge the hotfix PR (see [Release Workflow — use `cw-release`](#release-workflow--use-cw-release)).
 
-> **Note:** `Makefile`, `.github/`, `.cloudopsworks/labeler.yml`, `.cloudopsworks/Makefile`,
+> **Note:** `Makefile`, `.github/`, `.cloudopsworks/labeler.yml`,
 > and `.cloudopsworks/LICENSE` are owned by the template and will be overwritten on every upgrade.
 > Do not edit these files manually in derived repositories.
 
