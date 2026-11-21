@@ -73,7 +73,12 @@ documentation; keep this file as the operational reference.
 | Device-farm deploy | AWS Device Farm and GCP Firebase Test Lab |
 | GitVersion + Tronador | Semantic versioning via `tronador versions` |
 | Security integrations | Optional Snyk, Semgrep, SonarQube, DependencyTrack hooks |
-| Template marker | `.cloudopsworks/.fluttermobile` consumed by `cd/checkout/check-module-version` |
+| Template marker | `.cloudopsworks/.flutter` consumed by `cd/checkout/check-module-version` |
+
+Keep both marker files. Blueprints checkout and guarded version generation use
+`.cloudopsworks/.flutter`. Tronador CLI 0.6.1 still needs
+`.cloudopsworks/.fluttermobile` for `tronador project detect` and `tronador project init`.
+Remove the compatibility marker only when the minimum supported CLI recognizes `.flutter` for both commands.
 
 ---
 
@@ -82,7 +87,8 @@ documentation; keep this file as the operational reference.
 ```
 .
 ├── .cloudopsworks/
-│   ├── .fluttermobile          # Marker: identifies this as a Flutter mobile template repo
+│   ├── .flutter                # Canonical template and release marker
+│   ├── .fluttermobile          # Compatibility marker for Tronador CLI 0.6.1
 │   ├── _VERSION                # Last template version applied (managed by tronador repos upgrade)
 │   ├── cloudopsworks-ci.yaml   # Branch protection, GitFlow, CD deployment triggers
 │   ├── labeler.yml             # PR label rules for platform workflows
@@ -943,7 +949,7 @@ flutter pub get && flutter analyze && flutter test
 - The checkout action attempts to query `https://github.com/.git`
 
 **Checks:**
-1. Confirm `.cloudopsworks/.fluttermobile` exists in the repository root
+1. Confirm `.cloudopsworks/.flutter` exists in the repository root
 2. Confirm all workflows use `cloudopsworks/blueprints/cd/checkout@v5.10`
 3. Confirm `blueprint_ref: v5.10` appears in workflow inputs
 
