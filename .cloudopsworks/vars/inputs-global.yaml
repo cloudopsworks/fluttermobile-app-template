@@ -126,3 +126,10 @@ preview:
 #cloud: "aws" # aws | azure | gcp
 #cloud_type: "device-farm"
 #runner_set: "ubuntu-latest"
+
+# Optional additions to the blueprint artifact packaging defaults.
+#zipGlobs:
+#  - "assets/**"
+#excludeGlobs:
+#  - "assets/test-fixtures/**"
+#
